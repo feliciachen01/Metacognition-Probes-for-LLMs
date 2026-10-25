@@ -11,15 +11,40 @@ tested as a working, benchmarked service.
 
 ## Results
 
-_Not measured yet. Numbers go here only after a full run and the hand-label check._
+**Qwen2.5-1.5B-Instruct, 3,000 closed-book questions, CPU laptop.** AUROC for spotting a wrong
+answer, with 95% bootstrap intervals. "Test" uses held-out questions from TriviaQA and NQ-Open (the
+datasets the probes were trained on); "transfer" is PopQA, a dataset the probes never saw.
 
-| Method | AUROC test | AUROC transfer (PopQA) | ECE | Added latency |
-|---|---|---|---|---|
-| Probe, before answer | [ ] | [ ] | [ ] | [ ] |
-| Probe, after answer | [ ] | [ ] | [ ] | [ ] |
-| Token log-prob | [ ] | [ ] | [ ] | ~0 |
-| Stated confidence | [ ] | [ ] | [ ] | [ ] |
-| Sampling agreement (k=5) | [ ] | [ ] | [ ] | [ ] |
+| Method | AUROC test (n=447) | AUROC transfer (n=800) | Extra time per question |
+|---|---|---|---|
+| Probe, after answer (layer 19) | **0.872** [0.83, 0.91] | 0.829 [0.78, 0.87] | ~0 |
+| Probe, before answer (layer 19) | 0.777 [0.72, 0.82] | 0.862 [0.83, 0.90] | ~0 (known before generating) |
+| Token log-prob, min | 0.789 [0.74, 0.83] | **0.874** [0.84, 0.90] | 0 |
+| Token log-prob, mean | 0.773 [0.72, 0.82] | 0.862 [0.82, 0.90] | 0 |
+| Stated confidence | 0.763 [0.71, 0.81] | 0.735 [0.68, 0.79] | +1.1 s |
+| Sampling agreement (k=3) | 0.744 [0.69, 0.79] | 0.840 [0.80, 0.88] | +2.6 s |
+
+**Findings** (paired bootstrap on the same questions):
+
+1. **On familiar question types, the after-answer probe beats every alternative**: +0.08 AUROC over
+   the best token-probability score [+0.04, +0.13], +0.11 over stated confidence and +0.13 over
+   sampling, at no extra cost.
+2. **That advantage does not transfer.** On PopQA it falls behind the free token-probability score
+   (−0.045 [−0.085, −0.005]): the probe partly learns cues specific to its training datasets.
+3. **The before-answer probe transfers better than the after-answer one** (+0.034 [+0.001, +0.067]
+   on PopQA) and ties the token-probability score on both splits, while being available before a
+   single answer token exists, early enough to skip generation or fetch sources instead.
+4. **Asking the model how sure it is is the weakest signal**, and sampling costs 2.6 s per question
+   without beating free token probabilities.
+
+Labels: automatic correctness scoring agreed with hand labels on 77 of 78 pilot answers (kappa 0.93);
+the one miss led to a stricter rule for hedged and list answers. Error rates: 75% test, 87% transfer
+(small models answer most closed-book trivia wrongly, which is the behaviour being studied).
+
+![Where the signal lives](docs/qwen1.5b_layer_sweep.png)
+
+The signal rises through the middle of the network and peaks at layer 19 of 28. The pilot on
+Qwen2.5-0.5B showed the same shape with wider intervals (only ~30 correct answers per split).
 
 ## How it works
 
@@ -90,7 +115,7 @@ kwik handcheck-agree --config configs/pilot.yaml
 
 ### 3. Bigger runs
 
-- `configs/laptop-1.5b.yaml`: Qwen2.5-1.5B on CPU, 6,500 questions (overnight).
+- `configs/laptop-1.5b.yaml`: Qwen2.5-1.5B on CPU, 3,000 questions (about 2 h 45 min on a Core Ultra laptop). Full report: `docs/qwen1.5b_results.md`.
 - `notebooks/colab_7b.ipynb`: Qwen2.5-7B in 4-bit on a free Colab T4. Use it before Dec 1.
 
 ### 4. Serve and benchmark
