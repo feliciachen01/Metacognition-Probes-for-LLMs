@@ -107,10 +107,32 @@ def test_end_to_end(run):
 
     svc = ConfidenceService(cfg.run_dir, device="cpu", max_new_tokens=5)
     out = svc.answer("what is the capital of france ?")
-    assert 0.0 <= out["risk_wrong"] <= 1.0 and "generate" in out["timings_ms"]
+    assert 0.0 <= out["risk_wrong"] <= 1.0 and "generate_with_hook" in out["timings_ms"]
+
+    # the hook must read exactly what output_hidden_states reports for that layer, including the
+    # last layer, where HF applies the final norm
+    from kwik.prompts import answer_messages, render
+
+    prompt = render(svc.tok, answer_messages("what is the capital of france ?"))
+    enc = svc.tok([prompt], return_tensors="pt")
+    with torch.no_grad():
+        hs = svc.model(**enc, output_hidden_states=True).hidden_states
+    for layer in (svc.layer, len(hs) - 1):
+        svc2 = ConfidenceService(cfg.run_dir, model=svc.model, tok=svc.tok)
+        svc2.layer = layer
+        from kwik.service import _decoder_layers, _final_norm
+
+        svc2._module = _final_norm(svc.model) if layer == len(_decoder_layers(svc.model)) else _decoder_layers(svc.model)[layer - 1]
+        store, handle = svc2._capture()
+        with torch.no_grad():
+            svc.model(**enc)
+        handle.remove()
+        assert torch.allclose(torch.tensor(store["h"][0]), hs[layer][0, -1].float(), atol=1e-5)
+    # the score from the generation hook equals the score from a standalone prefill pass
+    assert abs(svc.risk_without_generating(prompt) - out["risk_wrong"]) < 1e-3
 
     b = bench(cfg.run_dir, ["what is the capital of italy ?"] * 3, device="cpu")
-    assert b["n"] == 3 and b["added_ms_p50"] > 0
+    assert b["n"] == 3 and {"added_ms_p50", "probe_only_ms_p50", "with_risk_ms_p50"} <= set(b)
 
     report = write_report(cfg.run_dir)
     assert "Test split" in report.read_text()

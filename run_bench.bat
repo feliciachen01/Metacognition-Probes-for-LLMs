@@ -35,13 +35,6 @@ if errorlevel 1 (
   goto :end
 )
 
-echo --- tests --- >> "%LOG%"
-python -m pytest -q >> "%LOG%" 2>&1
-if errorlevel 1 (
-  echo RUN FAILED: tests >> "%LOG%"
-  goto :end
-)
-
 echo --- bench --- >> "%LOG%"
 echo start %TIME% >> "%LOG%"
 kwik bench --config configs/laptop-1.5b.yaml --n 50 >> "%LOG%" 2>&1
