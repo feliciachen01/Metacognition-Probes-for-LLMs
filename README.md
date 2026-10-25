@@ -144,6 +144,16 @@ curl -X POST localhost:8000/answer -H "Content-Type: application/json" -d "{\"qu
   states approximate semantic entropy cheaply. This repo adds a "before the answer" position,
   transfer to a held-out long-tail dataset, and a served API with measured overhead.
 
+## What broke
+
+| What happened | Why | What changed |
+|---|---|---|
+| The 0.5B pilot's intervals were too wide to separate any methods | The model got ~10% of answers right, leaving ~30 correct answers per split | Moved to 1.5B (~100+ correct per split) and added bootstrap intervals and paired comparisons to every report |
+| "New York City, Tokyo, and Beijing" was scored correct for "largest cities" | Containment credit let one right item inside a wrong list count | Hedges and lists now need every part to be an accepted answer; found by the hand check (77/78 agreement) |
+| Re-scoring the pilot flipped a label that should not have changed | Only the first 20 accepted answers per question were saved; TriviaQA has more aliases than that | All accepted answers are saved now |
+| The in-distribution win did not hold on PopQA | The after-answer probe partly learns cues specific to TriviaQA and NQ | Reported as a finding; the before-answer probe transfers better and is the one the API serves |
+| Models could not be downloaded in sandboxed environments | Hugging Face was blocked by the network allowlist | Runs happen on a normal Windows install (one-click `run_*.bat` scripts) and on Colab |
+
 ## Tests
 
 `pytest -q` runs scoring and metric unit tests plus an offline end-to-end run on a tiny randomly

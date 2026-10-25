@@ -52,6 +52,9 @@ def bench(run_dir: str | Path, questions: list[str], device: str = "auto", repea
     """Added latency of the probe = separate prompt pass + probe, vs plain generation alone.
     (A production server could reuse the prompt pass's KV cache; this measures the simple version.)"""
     svc = ConfidenceService(run_dir, device)
+    warm = render(svc.tok, answer_messages(questions[0]))  # first call pays one-off setup costs
+    generate(svc.model, svc.tok, [warm], svc.max_new_tokens, capture=False)
+    svc.risk_before_answer(warm)
     plain, added = [], []
     for _ in range(repeats):
         for q in questions:
@@ -63,6 +66,9 @@ def bench(run_dir: str | Path, questions: list[str], device: str = "auto", repea
     out = {"device": svc.device, "n": len(plain),
            "generate_ms_p50": float(np.percentile(plain, 50)), "generate_ms_p95": float(np.percentile(plain, 95)),
            "added_ms_p50": float(np.percentile(added, 50)), "added_ms_p95": float(np.percentile(added, 95))}
+    out["added_pct_of_generate_p50"] = 100 * out["added_ms_p50"] / out["generate_ms_p50"]
+    # the exact code path POST /answer runs, on real questions, kept as examples for the README
+    out["examples"] = [{"question": q, **svc.answer(q)} for q in questions[:5]]
     (Path(run_dir) / "bench.json").write_text(json.dumps(out, indent=2))
     return out
 
