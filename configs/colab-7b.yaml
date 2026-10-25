@@ -1,15 +1,16 @@
 # Free Colab T4 (16 GB). Use before Dec 1; the companion owns free GPU time Dec 1-22.
+# Same questions and settings as configs/laptop-1.5b.yaml, so model sizes compare directly.
 # 7B in bfloat16 does not fit a T4 with hidden-state capture, so it loads in 4-bit (bitsandbytes).
 run_name: qwen7b
 model_id: Qwen/Qwen2.5-7B-Instruct
 datasets:
-  - {name: triviaqa, n: 3000, role: train}
-  - {name: nq_open, n: 2000, role: train}
-  - {name: popqa, n: 1500, role: transfer}
+  - {name: triviaqa, n: 1300, role: train}
+  - {name: nq_open, n: 900, role: train}
+  - {name: popqa, n: 800, role: transfer}
 out_dir: /content/drive/MyDrive/kwik-runs
 batch_size: 16
 max_new_tokens: 24
 layer_stride: 2
 device: cuda
 load_in_4bit: true
-sampling_k: 5
+sampling_k: 3
