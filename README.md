@@ -17,8 +17,8 @@ datasets the probes were trained on); "transfer" is PopQA, a dataset the probes 
 
 | Method | AUROC test (n=447) | AUROC transfer (n=800) | Extra time per question |
 |---|---|---|---|
-| Probe, after answer (layer 19) | **0.872** [0.83, 0.91] | 0.829 [0.78, 0.87] | ~0 |
-| Probe, before answer (layer 19) | 0.777 [0.72, 0.82] | 0.862 [0.83, 0.90] | ~0 (known before generating) |
+| Probe, after answer (layer 19) | **0.872** [0.83, 0.91] | 0.829 [0.78, 0.87] | not served, not benchmarked |
+| Probe, before answer (layer 19) | 0.777 [0.72, 0.82] | 0.862 [0.83, 0.90] | +18 ms (measured, p50) |
 | Token log-prob, min | 0.789 [0.74, 0.83] | **0.874** [0.84, 0.90] | 0 |
 | Token log-prob, mean | 0.773 [0.72, 0.82] | 0.862 [0.82, 0.90] | 0 |
 | Stated confidence | 0.763 [0.71, 0.81] | 0.735 [0.68, 0.79] | +1.1 s |
@@ -28,7 +28,7 @@ datasets the probes were trained on); "transfer" is PopQA, a dataset the probes 
 
 1. **On familiar question types, the after-answer probe beats every alternative**: +0.08 AUROC over
    the best token-probability score [+0.04, +0.13], +0.11 over stated confidence and +0.13 over
-   sampling, at no extra cost.
+   sampling, with no extra model pass.
 2. **That advantage does not transfer.** On PopQA it falls behind the free token-probability score
    (−0.045 [−0.085, −0.005]): the probe partly learns cues specific to its training datasets.
 3. **The before-answer probe transfers better than the after-answer one** (+0.034 [+0.001, +0.067]
@@ -37,8 +37,15 @@ datasets the probes were trained on); "transfer" is PopQA, a dataset the probes 
 4. **Asking the model how sure it is is the weakest signal**, and sampling costs 2.6 s per question
    without beating free token probabilities.
 
-Labels: automatic correctness scoring agreed with hand labels on 77 of 78 pilot answers (kappa 0.93);
-the one miss led to a stricter rule for hedged and list answers. Error rates: 75% test, 87% transfer
+**Serving cost** (`kwik bench`, 50 questions, Core Ultra laptop CPU): the API reads the probe's layer
+during generation's own first pass, so the risk score exists before the first answer token. It adds
+18 ms at the median (0.8% of a 2.2 s answer); the probe itself takes 1.5 ms. The 95th percentile
+(188 ms) is mostly machine noise. Details: `docs/qwen1.5b_bench.json`.
+
+Labels: automatic correctness scoring agreed with 200 hand labels on 97.5% of answers (kappa 0.92;
+78 from the 0.5B pilot, 122 from the 1.5B run). Of the 5 disagreements, 3 were the scorer being too
+strict (for example "Catholicism" against "Catholic Church"), and an early one led to a stricter
+rule for hedged and list answers. Error rates: 75% test, 87% transfer
 (small models answer most closed-book trivia wrongly, which is the behaviour being studied).
 
 ![Where the signal lives](docs/qwen1.5b_layer_sweep.png)
@@ -121,8 +128,8 @@ kwik handcheck-agree --config configs/pilot.yaml
 ### 4. Serve and benchmark
 
 ```
-kwik bench --config configs/pilot.yaml
-kwik serve --config configs/pilot.yaml
+kwik bench --config configs/laptop-1.5b.yaml
+kwik serve --config configs/laptop-1.5b.yaml
 ```
 
 ```
@@ -152,6 +159,7 @@ curl -X POST localhost:8000/answer -H "Content-Type: application/json" -d "{\"qu
 | "New York City, Tokyo, and Beijing" was scored correct for "largest cities" | Containment credit let one right item inside a wrong list count | Hedges and lists now need every part to be an accepted answer; found by the hand check (77/78 agreement) |
 | Re-scoring the pilot flipped a label that should not have changed | Only the first 20 accepted answers per question were saved; TriviaQA has more aliases than that | All accepted answers are saved now |
 | The in-distribution win did not hold on PopQA | The after-answer probe partly learns cues specific to TriviaQA and NQ | Reported as a finding; the before-answer probe transfers better and is the one the API serves |
+| The first API benchmark added 1.3 s per question (+65%) | The API ran a separate full pass over the prompt just to read one layer | A forward hook now reads the layer during generation's own first pass: +18 ms (0.8%), same risk scores |
 | Models could not be downloaded in sandboxed environments | Hugging Face was blocked by the network allowlist | Runs happen on a normal Windows install (one-click `run_*.bat` scripts) and on Colab |
 
 ## Tests

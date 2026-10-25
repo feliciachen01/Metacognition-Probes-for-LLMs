@@ -1,0 +1,64 @@
+{
+  "device": "cpu",
+  "n": 50,
+  "generate_ms_p50": 2176.298200036399,
+  "generate_ms_p95": 3178.120615007356,
+  "with_risk_ms_p50": 2195.3927000868134,
+  "with_risk_ms_p95": 3200.1027049671384,
+  "added_ms_p50": 17.857199942227453,
+  "added_ms_p95": 187.58197507122514,
+  "probe_only_ms_p50": 1.4649999999999999,
+  "added_pct_of_generate_p50": 0.8205309337630655,
+  "examples": [
+    {
+      "question": "Which Bond villain has been played by Telly Savalas, Donald Pleasance, Charles Gray, and Max Von Sydow?",
+      "answer": "Joker",
+      "risk_wrong": 0.8633,
+      "risk_from": "before answer, layer 19",
+      "timings_ms": {
+        "generate_with_hook": 2353.8,
+        "probe": 1.7
+      }
+    },
+    {
+      "question": "What is the name of the character played by actor Nicholas Lyndhurst in the British television series \u2018Goodnight Sweetheart\u2019?",
+      "answer": "Geraldine",
+      "risk_wrong": 0.9974,
+      "risk_from": "before answer, layer 19",
+      "timings_ms": {
+        "generate_with_hook": 3010.3,
+        "probe": 1.4
+      }
+    },
+    {
+      "question": "In which Italian city is the newspaper 'La Stampa' published?",
+      "answer": "Milan",
+      "risk_wrong": 0.2306,
+      "risk_from": "before answer, layer 19",
+      "timings_ms": {
+        "generate_with_hook": 1736.8,
+        "probe": 1.41
+      }
+    },
+    {
+      "question": "\"Who starred in and directed the 2004 movie \"\"Beyond the Sea\"\"?\"",
+      "answer": "Brad Pitt",
+      "risk_wrong": 0.9499,
+      "risk_from": "before answer, layer 19",
+      "timings_ms": {
+        "generate_with_hook": 1965.8,
+        "probe": 1.48
+      }
+    },
+    {
+      "question": "Ivan Galamian has had world-wide influence as a teacher of what?",
+      "answer": "music",
+      "risk_wrong": 0.9475,
+      "risk_from": "before answer, layer 19",
+      "timings_ms": {
+        "generate_with_hook": 1483.1,
+        "probe": 1.27
+      }
+    }
+  ]
+}
