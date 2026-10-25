@@ -11,47 +11,56 @@ tested as a working, benchmarked service.
 
 ## Results
 
-**Qwen2.5-1.5B-Instruct, 3,000 closed-book questions, CPU laptop.** AUROC for spotting a wrong
-answer, with 95% bootstrap intervals. "Test" uses held-out questions from TriviaQA and NQ-Open (the
-datasets the probes were trained on); "transfer" is PopQA, a dataset the probes never saw.
+**Qwen2.5 1.5B (laptop CPU) and 7B (free Colab T4, 4-bit), the same 3,000 closed-book questions.**
+AUROC for spotting a wrong answer, with 95% bootstrap intervals. "Test" is held-out questions from
+TriviaQA and NQ-Open, the datasets the probes were trained on (n=447). "Transfer" is PopQA, a dataset
+the probes never saw (n=800).
 
-| Method | AUROC test (n=447) | AUROC transfer (n=800) | Extra time per question |
-|---|---|---|---|
-| Probe, after answer (layer 19) | **0.872** [0.83, 0.91] | 0.829 [0.78, 0.87] | not served, not benchmarked |
-| Probe, before answer (layer 19) | 0.777 [0.72, 0.82] | 0.862 [0.83, 0.90] | +18 ms (measured, p50) |
-| Token log-prob, min | 0.789 [0.74, 0.83] | **0.874** [0.84, 0.90] | 0 |
-| Token log-prob, mean | 0.773 [0.72, 0.82] | 0.862 [0.82, 0.90] | 0 |
-| Stated confidence | 0.763 [0.71, 0.81] | 0.735 [0.68, 0.79] | +1.1 s |
-| Sampling agreement (k=3) | 0.744 [0.69, 0.79] | 0.840 [0.80, 0.88] | +2.6 s |
+| Method | 1.5B test | 1.5B transfer | 7B test | 7B transfer | Extra time per question |
+|---|---|---|---|---|---|
+| Probe, after answer | **0.872** [0.83, 0.91] | 0.829 [0.78, 0.87] | **0.863** [0.83, 0.90] | 0.858 [0.82, 0.90] | not served |
+| Probe, before answer | 0.777 [0.72, 0.82] | 0.862 [0.83, 0.90] | 0.783 [0.74, 0.83] | 0.844 [0.80, 0.89] | +18 ms (1.5B, p50) |
+| Token log-prob, min | 0.789 [0.74, 0.83] | **0.874** [0.84, 0.90] | 0.813 [0.77, 0.85] | **0.895** [0.86, 0.92] | 0 |
+| Token log-prob, mean | 0.773 [0.72, 0.82] | 0.862 [0.82, 0.90] | 0.806 [0.77, 0.85] | **0.895** [0.87, 0.92] | 0 |
+| Sampling agreement (k=3) | 0.744 [0.69, 0.79] | 0.840 [0.80, 0.88] | 0.799 [0.76, 0.84] | 0.839 [0.80, 0.87] | +2.6 s (1.5B), +1.3 s (7B) |
+| Stated confidence | 0.763 [0.71, 0.81] | 0.735 [0.68, 0.79] | 0.708 [0.67, 0.75] | 0.725 [0.68, 0.76] | +1.1 s (1.5B), +0.6 s (7B) |
+
+Error rates: 1.5B 75% test / 87% transfer; 7B 60% / 86%. Correct answers available for evaluation:
+1.5B 113 / 102; 7B 179 / 116.
 
 **Findings** (paired bootstrap on the same questions):
 
-1. **On familiar question types, the after-answer probe beats every alternative**: +0.08 AUROC over
-   the best token-probability score [+0.04, +0.13], +0.11 over stated confidence and +0.13 over
-   sampling, with no extra model pass.
-2. **That advantage does not transfer.** On PopQA it falls behind the free token-probability score
-   (−0.045 [−0.085, −0.005]): the probe partly learns cues specific to its training datasets.
-3. **The before-answer probe transfers better than the after-answer one** (+0.034 [+0.001, +0.067]
-   on PopQA) and ties the token-probability score on both splits, while being available before a
-   single answer token exists, early enough to skip generation or fetch sources instead.
-4. **Asking the model how sure it is is the weakest signal**, and sampling costs 2.6 s per question
-   without beating free token probabilities.
+1. **On familiar question types, the after-answer probe beats every alternative at both sizes.**
+   Against the best token-probability score: +0.08 [+0.04, +0.13] at 1.5B, +0.05 [+0.01, +0.09] at 7B.
+   Against sampling: +0.13 and +0.06. Against stated confidence: +0.11 and +0.15. The margin shrinks
+   as the model's own token probabilities get better.
+2. **The advantage does not transfer, at either size.** On PopQA the after-answer probe falls behind
+   the free token-probability score: −0.045 [−0.085, −0.005] at 1.5B, −0.037 [−0.072, −0.002] at 7B.
+   The probes partly learn cues specific to their training datasets.
+3. **The before-answer probe sees most of the signal before a single answer token exists** (0.78
+   test, 0.84–0.86 transfer), early enough to fetch sources instead of guessing. At 1.5B it transferred
+   better than the after-answer probe (+0.034 [+0.001, +0.067]); at 7B it did not (−0.014 [−0.048,
+   +0.016]), so that advantage is not established.
+4. **Asking the model how sure it is is the weakest signal at both sizes**, and sampling costs extra
+   time without beating free token probabilities.
 
-**Serving cost** (`kwik bench`, 50 questions, Core Ultra laptop CPU): the API reads the probe's layer
-during generation's own first pass, so the risk score exists before the first answer token. It adds
-18 ms at the median (0.8% of a 2.2 s answer); the probe itself takes 1.5 ms. The 95th percentile
+**Serving cost** (`kwik bench`, 1.5B, 50 questions, Core Ultra laptop CPU): the API reads the probe's
+layer during generation's own first pass, so the risk score exists before the first answer token. It
+adds 18 ms at the median (0.8% of a 2.2 s answer); the probe itself takes 1.5 ms. The 95th percentile
 (188 ms) is mostly machine noise. Details: `docs/qwen1.5b_bench.json`.
 
-Labels: automatic correctness scoring agreed with 200 hand labels on 97.5% of answers (kappa 0.92;
+**Labels:** automatic correctness scoring agreed with 200 hand labels on 97.5% of answers (kappa 0.92;
 78 from the 0.5B pilot, 122 from the 1.5B run). Of the 5 disagreements, 3 were the scorer being too
 strict (for example "Catholicism" against "Catholic Church"), and an early one led to a stricter
-rule for hedged and list answers. Error rates: 75% test, 87% transfer
-(small models answer most closed-book trivia wrongly, which is the behaviour being studied).
+rule for hedged and list answers.
 
-![Where the signal lives](docs/qwen1.5b_layer_sweep.png)
+| 1.5B | 7B |
+|---|---|
+| ![1.5B layer sweep](docs/qwen1.5b_layer_sweep.png) | ![7B layer sweep](docs/qwen7b_layer_sweep.png) |
 
-The signal rises through the middle of the network and peaks at layer 19 of 28. The pilot on
-Qwen2.5-0.5B showed the same shape with wider intervals (only ~30 correct answers per split).
+At both sizes the signal rises through the middle of the network and peaks around three quarters of
+the way up (layer 19 of 28 at 1.5B, layer 21 of 28 at 7B), then falls slightly near the output.
+Full reports: `docs/qwen1.5b_results.md`, `docs/qwen7b_results.md`.
 
 ## How it works
 
@@ -123,7 +132,7 @@ kwik handcheck-agree --config configs/pilot.yaml
 ### 3. Bigger runs
 
 - `configs/laptop-1.5b.yaml`: Qwen2.5-1.5B on CPU, 3,000 questions (about 2 h 45 min on a Core Ultra laptop). Full report: `docs/qwen1.5b_results.md`.
-- `notebooks/colab_7b.ipynb`: Qwen2.5-7B in 4-bit on a free Colab T4. Use it before Dec 1.
+- `notebooks/colab_7b.ipynb`: Qwen2.5-7B in 4-bit on a free Colab T4, same 3,000 questions (about 1 h 30 min). Full report: `docs/qwen7b_results.md`.
 
 ### 4. Serve and benchmark
 
@@ -158,7 +167,7 @@ curl -X POST localhost:8000/answer -H "Content-Type: application/json" -d "{\"qu
 | The 0.5B pilot's intervals were too wide to separate any methods | The model got ~10% of answers right, leaving ~30 correct answers per split | Moved to 1.5B (~100+ correct per split) and added bootstrap intervals and paired comparisons to every report |
 | "New York City, Tokyo, and Beijing" was scored correct for "largest cities" | Containment credit let one right item inside a wrong list count | Hedges and lists now need every part to be an accepted answer; found by the hand check (77/78 agreement) |
 | Re-scoring the pilot flipped a label that should not have changed | Only the first 20 accepted answers per question were saved; TriviaQA has more aliases than that | All accepted answers are saved now |
-| The in-distribution win did not hold on PopQA | The after-answer probe partly learns cues specific to TriviaQA and NQ | Reported as a finding; the before-answer probe transfers better and is the one the API serves |
+| The in-distribution win did not hold on PopQA | The probes partly learn cues specific to TriviaQA and NQ | Reported as a finding; it held at both 1.5B and 7B, so it is not a small-model artefact |
 | The first API benchmark added 1.3 s per question (+65%) | The API ran a separate full pass over the prompt just to read one layer | A forward hook now reads the layer during generation's own first pass: +18 ms (0.8%), same risk scores |
 | Models could not be downloaded in sandboxed environments | Hugging Face was blocked by the network allowlist | Runs happen on a normal Windows install (one-click `run_*.bat` scripts) and on Colab |
 
