@@ -1,0 +1,12 @@
+# Main laptop run. Run overnight, never during the companion's latency tests.
+run_name: qwen1.5b
+model_id: Qwen/Qwen2.5-1.5B-Instruct
+datasets:
+  - {name: triviaqa, n: 3000, role: train}
+  - {name: nq_open, n: 2000, role: train}
+  - {name: popqa, n: 1500, role: transfer}
+batch_size: 8
+max_new_tokens: 24
+layer_stride: 2
+device: cpu
+sampling_k: 5

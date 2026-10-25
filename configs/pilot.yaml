@@ -1,0 +1,13 @@
+# Week-1 pilot on your laptop (CPU). Checks the whole pipeline and gives first numbers.
+# Expect roughly 30-90 minutes on a Core Ultra laptop; time it and size the next run from that.
+run_name: pilot-qwen0.5b
+model_id: Qwen/Qwen2.5-0.5B-Instruct
+datasets:
+  - {name: triviaqa, n: 600, role: train}
+  - {name: nq_open, n: 400, role: train}
+  - {name: popqa, n: 300, role: transfer}
+batch_size: 8
+max_new_tokens: 24
+layer_stride: 2
+device: cpu
+sampling_k: 5
