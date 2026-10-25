@@ -48,6 +48,25 @@ def accuracy_at_coverage(y: np.ndarray, r: np.ndarray, coverage: float = 0.8) ->
     return float(1 - risk[i])
 
 
+def _boot_indices(n: int, n_boot: int, seed: int) -> np.ndarray:
+    return np.random.default_rng(seed).integers(0, n, size=(n_boot, n))
+
+
+def bootstrap_auroc(y: np.ndarray, r: np.ndarray, n_boot: int = 2000, seed: int = 0) -> tuple[float, float]:
+    """95% percentile interval for AUROC, resampling questions."""
+    vals = [auroc(y[i], r[i]) for i in _boot_indices(len(y), n_boot, seed) if len(np.unique(y[i])) == 2]
+    return float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))
+
+
+def paired_auroc_diff(y: np.ndarray, r1: np.ndarray, r2: np.ndarray, n_boot: int = 2000,
+                      seed: int = 0) -> tuple[float, float, float]:
+    """AUROC(r1) - AUROC(r2) on the same questions, with a 95% interval from the same resamples.
+    Paired, so it is tighter than comparing two separate intervals."""
+    diffs = [auroc(y[i], r1[i]) - auroc(y[i], r2[i])
+             for i in _boot_indices(len(y), n_boot, seed) if len(np.unique(y[i])) == 2]
+    return auroc(y, r1) - auroc(y, r2), float(np.percentile(diffs, 2.5)), float(np.percentile(diffs, 97.5))
+
+
 def summarize(y: np.ndarray, r: np.ndarray) -> dict:
     return {"n": int(len(y)), "error_rate": float(y.mean()), "auroc": auroc(y, r), "ece": ece(y, r),
             "brier": brier(y, r), "aurc": aurc(y, r), "acc@80%": accuracy_at_coverage(y, r, 0.8)}

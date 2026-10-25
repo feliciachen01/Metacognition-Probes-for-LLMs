@@ -38,12 +38,32 @@ def exact_match(pred: str, golds: list[str]) -> bool:
     return bool(p) and any(p == normalize(g) for g in golds)
 
 
+_LIST_SPLIT = re.compile(r",|;|\band\b|\bor\b|/", flags=re.I)
+
+
+def is_hedge_or_list(pred: str) -> bool:
+    """'X or Y' hedges and lists of 3+ items. Two-part answers like 'Seattle, Washington' are not lists."""
+    if re.search(r"\bor\b", pred, flags=re.I):
+        return True
+    return len([p for p in _LIST_SPLIT.split(pred) if p.strip()]) >= 3
+
+
+def _contains_any(text: str, golds: list[str]) -> bool:
+    padded = f" {normalize(text)} "
+    return any(normalize(g) and f" {normalize(g)} " in padded for g in golds)
+
+
 def contains_match(pred: str, golds: list[str]) -> bool:
+    """Credit when a gold alias appears as whole words in a short prediction. For hedges and lists,
+    every part must contain a gold alias: 'Butane or propane' is a guess, 'B3 or niacin' is two names
+    for one answer, and one right city inside a wrong list is not an answer."""
     p = normalize(pred)
     if not p or len(p.split()) > MAX_CONTAINS_WORDS:
         return False
-    padded = f" {p} "
-    return any(normalize(g) and f" {normalize(g)} " in padded for g in golds)
+    if is_hedge_or_list(pred):
+        parts = [x for x in _LIST_SPLIT.split(pred) if normalize(x)]
+        return bool(parts) and all(_contains_any(x, golds) for x in parts)
+    return _contains_any(pred, golds)
 
 
 def score(pred: str, golds: list[str]) -> dict:

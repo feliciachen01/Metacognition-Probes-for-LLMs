@@ -1,12 +1,14 @@
-# Main laptop run. Run overnight, never during the companion's latency tests.
+# Main laptop run, sized to finish overnight on CPU (~3,000 questions).
+# Run overnight, never during the Truthful Companion's latency tests.
+# sampling_k is 3 (pilot used 5): sampling is the slowest step, and 3 keeps the baseline meaningful.
 run_name: qwen1.5b
 model_id: Qwen/Qwen2.5-1.5B-Instruct
 datasets:
-  - {name: triviaqa, n: 3000, role: train}
-  - {name: nq_open, n: 2000, role: train}
-  - {name: popqa, n: 1500, role: transfer}
+  - {name: triviaqa, n: 1300, role: train}
+  - {name: nq_open, n: 900, role: train}
+  - {name: popqa, n: 800, role: transfer}
 batch_size: 8
 max_new_tokens: 24
 layer_stride: 2
 device: cpu
-sampling_k: 5
+sampling_k: 3

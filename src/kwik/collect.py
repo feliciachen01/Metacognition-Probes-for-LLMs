@@ -94,7 +94,7 @@ def collect(cfg: Config, model=None, tok=None) -> Path:
                 s = score(pred, r["answers"])
                 fout.write(json.dumps({
                     "uid": r["uid"], "dataset": r["dataset"], "split": r["split"], "question": r["question"],
-                    "answers": r["answers"][:20], "raw": g.texts[i], "prediction": pred, **s,
+                    "answers": r["answers"], "raw": g.texts[i], "prediction": pred, **s,
                     "logprob_mean": float(g.logprob_mean[i]), "logprob_min": float(g.logprob_min[i]),
                     "n_tokens": int(g.n_tokens[i]), "batch_seconds": g.seconds, "batch_size": len(batch),
                 }) + "\n")

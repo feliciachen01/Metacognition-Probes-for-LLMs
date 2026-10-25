@@ -23,7 +23,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .collect import load_features
-from .metrics import auroc, summarize
+from .metrics import auroc, bootstrap_auroc, paired_auroc_diff, summarize
 
 C_GRID = (0.01, 0.1, 1.0)
 
@@ -128,11 +128,28 @@ def train_and_evaluate(run_dir: Path) -> dict:
             ok = np.isfinite(risk[ii])
             if ok.sum() == 0:
                 continue
+            lo, hi = bootstrap_auroc(y[ii][ok], risk[ii][ok])
             results.append({"method": name, "split": split, **summarize(y[ii][ok], risk[ii][ok]),
-                            "coverage_of_split": float(ok.mean())})
+                            "auroc_lo": lo, "auroc_hi": hi, "coverage_of_split": float(ok.mean())})
 
     res = pd.DataFrame(results)
     res.to_csv(run_dir / "results.csv", index=False)
+
+    # paired comparison: the before-answer probe against every other method, same questions
+    probe_name = next(n for n in scores_out if n.startswith("probe (before"))
+    comps = []
+    for split in ("test", "transfer"):
+        ii = idx[split]
+        if len(ii) == 0:
+            continue
+        for name, risk in scores_out.items():
+            if name == probe_name:
+                continue
+            ok = np.isfinite(risk[ii])
+            d, lo, hi = paired_auroc_diff(y[ii][ok], scores_out[probe_name][ii][ok], risk[ii][ok])
+            comps.append({"split": split, "probe": probe_name, "versus": name, "auroc_diff": d,
+                          "lo": lo, "hi": hi, "clear": bool(lo > 0 or hi < 0)})
+    pd.DataFrame(comps).to_csv(run_dir / "comparisons.csv", index=False)
     pd.DataFrame({"uid": df["uid"], "split": df["split"], "y": y, **scores_out}).to_parquet(run_dir / "scores.parquet")
     summary = {"choices": {k: vars(v) for k, v in choices.items()},
                "n": {k: int(len(v)) for k, v in idx.items()},

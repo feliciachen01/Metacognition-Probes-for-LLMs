@@ -77,12 +77,27 @@ def write_report(run_dir: Path) -> Path:
         t = res[res.split == split].sort_values("auroc", ascending=False)
         if t.empty:
             return "_no rows_"
-        cols = ["method", "n", "auroc", "ece", "brier", "aurc", "acc@80%"]
+        cols = ["method", "n", "auroc [95% CI]", "ece", "brier", "aurc", "acc@80%"]
         lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
         for _, r in t.iterrows():
-            lines.append("| " + " | ".join([r["method"], str(int(r["n"]))] +
-                                           [f"{r[c]:.3f}" for c in cols[2:]]) + " |")
+            ci = f"{r['auroc']:.3f} [{r['auroc_lo']:.2f}, {r['auroc_hi']:.2f}]" if "auroc_lo" in r else f"{r['auroc']:.3f}"
+            lines.append("| " + " | ".join([r["method"], str(int(r["n"])), ci] +
+                                           [f"{r[c]:.3f}" for c in ("ece", "brier", "aurc", "acc@80%")]) + " |")
         return "\n".join(lines)
+
+    def comparisons() -> list[str]:
+        path = run_dir / "comparisons.csv"
+        if not path.exists():
+            return []
+        c = pd.read_csv(path)
+        out = ["## Is the before-answer probe better? (paired bootstrap, same questions)", "",
+               "| split | versus | AUROC difference [95% CI] | verdict |", "|---|---|---|---|"]
+        for _, r in c.iterrows():
+            verdict = ("probe better" if r["lo"] > 0 else "probe worse" if r["hi"] < 0 else "no clear difference")
+            out.append(f"| {r['split']} | {r['versus']} | {r['auroc_diff']:+.3f} [{r['lo']:+.3f}, {r['hi']:+.3f}] | {verdict} |")
+        return out + [""]
+
+    n_correct = {s: int((scores[scores.split == s]["y"] == 0).sum()) for s in ("test", "transfer")}
 
     md = [
         f"# Results: {cfg['run_name']}",
@@ -101,6 +116,10 @@ def write_report(run_dir: Path) -> Path:
         "",
         table("transfer"),
         "",
+        f"Correct answers available for evaluation: test {n_correct['test']}, transfer {n_correct['transfer']}. "
+        "Fewer than ~100 makes the intervals wide.",
+        "",
+        *comparisons(),
         "## Cost",
         "",
         *_cost_lines(run_dir),
