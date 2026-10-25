@@ -66,7 +66,8 @@ Anaconda Prompt:
 ```
 conda create -n kwik python=3.11 -y
 conda activate kwik
-cd path\to\know-what-it-knows
+git clone https://github.com/feliciachen01/kwik.git
+cd kwik
 pip install -e ".[serve,dev]"
 pytest -q
 kwik all --config configs/pilot.yaml
